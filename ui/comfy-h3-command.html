@@ -1,0 +1,53 @@
+<div id="comfy-h3-command">
+  <h3>MiniMax H3 · 簡易控制台</h3>
+  <p class="text-small text-muted">命令預覽 · 尚未連接帳號 · 不會扣點</p>
+  <div class="viz-controls">
+    <label class="form-label">創作方式<select class="form-select" id="h3-mode"><option value="文字生影片">文字生影片</option><option value="圖片生影片">圖片生影片</option><option value="參考素材生影片">參考素材生影片</option></select></label>
+    <label class="form-label">畫面比例（偏好）<select class="form-select" id="h3-ratio"><option>16:9 橫式</option><option>9:16 直式</option><option>1:1 方形</option></select></label>
+  </div>
+  <label class="form-label" for="h3-scene">你想看到什麼？</label>
+  <textarea class="form-control" id="h3-scene" rows="3">雨夜的台北街頭，一隻橘貓走過霓虹招牌，鏡頭緩慢跟拍，電影感。</textarea>
+  <p id="h3-source" class="text-small" hidden>素材：執行時在對話附上圖片／影片／音訊，或提供本機檔案路徑。</p>
+  <div class="viz-controls">
+    <label class="form-label">希望長度<select class="form-select" id="h3-duration"><option value="5">約 5 秒</option><option value="10">約 10 秒</option><option value="15">約 15 秒</option></select></label>
+    <label class="form-label">版本數<select class="form-select" id="h3-count"><option value="1">先做 1 個</option><option value="2">做 2 個比較</option></select></label>
+  </div>
+  <label class="form-label" for="h3-sound">聲音需求（選填）</label>
+  <input class="form-control" id="h3-sound" value="雨聲、腳步聲，不要配樂和旁白。">
+  <hr>
+  <label class="form-label" for="h3-command">可以直接對 Codex 說</label>
+  <textarea class="form-control" id="h3-command" rows="7" readonly aria-label="整理好的創作命令"></textarea>
+  <div class="viz-row" style="margin-top:12px">
+    <button class="btn btn-primary" id="h3-check" type="button">請 Codex 檢查連線與模板</button>
+    <span class="text-small text-muted">只檢查，不提交生成</span>
+  </div>
+  <p class="text-small" id="h3-status" aria-live="polite"></p>
+</div>
+<script>
+(() => {
+ const root = document.getElementById('comfy-h3-command');
+ const el = id => root.querySelector('#h3-' + id);
+ const keys = ['mode','ratio','scene','duration','count','sound'];
+ function values(){ return Object.fromEntries(keys.map(k=>[k,el(k).value])); }
+ function apply(s){ keys.forEach(k=>{if(s && typeof s[k]==='string' && s[k].length<3000){ const e=el(k); if(e.tagName!=='SELECT'||[...e.options].some(o=>o.value===s[k])) e.value=s[k]; }}); render(); }
+ function render(){
+   const s=values();
+   el('source').hidden=s.mode==='文字生影片';
+   el('command').value=`用我的 ComfyUI Cloud 帳號，找 MiniMax H3 的「${s.mode}」官方模板。\n畫面：${s.scene.trim() || '（請填寫畫面描述）'}\n希望比例 ${s.ratio}，約 ${s.duration} 秒，共 ${s.count} 個版本。\n聲音：${s.sound.trim() || '依畫面自然搭配。'}\n${s.mode==='文字生影片'?'':'使用我在對話附上的參考素材；素材缺少時先告訴我。\n'}先檢查帳號訂閱、模板、支援參數與可取得的費用資訊；不支援的設定先說明。無法取得費用時明說未知。先不要提交生成，等我說「開始生成」。`;
+ }
+ keys.forEach(k=>el(k).addEventListener('input',()=>{
+   render();
+   if(window.openai && window.openai.setWidgetState) window.openai.setWidgetState({modelContent:values(),privateContent:null}).catch(()=>{});
+ }));
+ apply(window.openai && window.openai.widgetState ? window.openai.widgetState.modelContent : null);
+ window.addEventListener('openai:set_globals',event=>{const s=event.detail && event.detail.globals && event.detail.globals.widgetState;if(s)apply(s.modelContent);});
+ el('check').addEventListener('click',async()=>{
+   if(!el('scene').value.trim()){el('status').textContent='請先填寫畫面描述。';el('scene').focus();return;}
+   if(!window.openai || !window.openai.sendFollowUpMessage){el('status').textContent='請選取上方命令，複製到對話中。';return;}
+   el('check').disabled=true;
+   try{await window.openai.sendFollowUpMessage({prompt:el('command').value+'\n若目前沒有 Comfy Cloud MCP 工具，請協助設定官方 https://cloud.comfy.org/mcp 連線，再由我登入。',title:'檢查 Comfy Cloud 連線與 H3 模板（不生成）'});el('status').textContent='已提出檢查要求；實際連線狀態請看對話回覆。';}
+   catch(e){el('status').textContent='未送出。你也可以選取上方命令，複製到對話中。';}
+   finally{el('check').disabled=false;}
+ });
+})();
+</script>
